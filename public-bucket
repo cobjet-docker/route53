@@ -1,0 +1,45 @@
+#!/bin/bash
+
+####################################################################################################
+# use this script as:
+#
+# curl -Lso public-bucket.sh  j.mp/public-bucket && chmod +x public-bucket.sh && ./public-bucket.sh
+#
+####################################################################################################
+# description is at: https://gist.github.com/lalyos/10110269/#file-readme-md
+####################################################################################################
+
+
+if [ $# -gt 0 ]; then
+  BUCKET=$1
+else
+  BUCKETS=$(aws s3api list-buckets --query Buckets[].Name --out text)
+  select BUCKET in $BUCKETS 'QUIT'; do
+    [[ $BUCKET == 'QUIT' ]] && exit 0
+    echo you have choosen: $BUCKET
+    break
+  done
+fi
+
+TIMESTAMP=$(date +%Y%m%d%H%M)
+POLICY=$(cat<<EOF
+{
+    "Version": "2008-10-17",
+    "Id": "s3-public-read-$TIMESTAMP",
+    "Statement": [
+        {
+            "Sid": "Stmt-$TIMESTAMP",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "*"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::$BUCKET/*"
+        }
+    ]
+}
+EOF
+)
+
+echo making $BUCKET public-read
+aws s3api put-bucket-policy --bucket $BUCKET --policy "$POLICY"
